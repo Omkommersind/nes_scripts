@@ -1,39 +1,39 @@
 ﻿local lookDirection <const> = 0x0400
-local xScreen <const> = 0x0450
-
 local xLow <const> = 0x04F0
 local xHigh <const> = 0x0500
-
 local yLow <const> = 0x0510
 local yHigh <const> = 0x0520
 
-local bg <const> = 0x0000AA
 local fg <const> = 0xFFFFFF
+local bg <const> = 0x0000AA
+
+local read = emu.read
+local drawString = emu.drawString
+local memNES = emu.memType.nesMemory
+
+local directionNames = {
+    [0xD0] = "right",
+    [0x00] = "left",
+}
+
+local function read16(lowAddr, highAddr)
+    return read(lowAddr, memNES, false) + read(highAddr, memNES, false) * 256
+end
 
 local function drawPlayerCoords()
-    local playerXLow = emu.read(xLow, emu.memType.nesMemory, false)
-	local playerXHigh = emu.read(xHigh, emu.memType.nesMemory, false)
-	local x = playerXLow + playerXHigh * 256
+    local x = read16(xLow, xHigh)
+    local y = read16(yLow, yHigh)
 
-    local playerYLow = emu.read(yLow, emu.memType.nesMemory, false)
-	local playerYHigh = emu.read(yHigh, emu.memType.nesMemory, false)
-	local y = playerYLow + playerYHigh * 256
-	
-    emu.drawString(8, 218, "x: " .. tostring(x), fg, bg)
-    emu.drawString(8, 228, "y: " .. tostring(y), fg, bg)
+    drawString(8, 218, string.format("x: %d", x), fg, bg)
+    drawString(8, 228, string.format("y: %d", y), fg, bg)
 end
 
 local function drawLookDirection()
-	local lookingAt = emu.read(lookDirection, emu.memType.nesMemory, false)
-	local dir = "left"
-	
-	if lookingAt == 0xD0 then
-		dir = "right"
-	end
-		
-	emu.drawString(8, 212, "Looking: " .. dir, fg, bg)
+    local dir = directionNames[read(lookDirection, memNES, false)] or "left"
+
+    drawString(8, 212, string.format("Looking: %s", dir), fg, bg)
 end
 
 emu.addEventCallback(drawPlayerCoords, emu.eventType.endFrame)
---emu.addEventCallback(drawLookDirection, emu.eventType.endFrame)
+-- emu.addEventCallback(drawLookDirection, emu.eventType.endFrame)
 emu.displayMessage("Script", "Darkwing Duck debug viewer loaded.")
