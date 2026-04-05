@@ -1,22 +1,29 @@
 ﻿local fg <const> = 0xFFFFFF
-local bg <const> = 0x0000AA
 local black <const> = 0x000000
 local green <const> = 0x00AA00
-local red <const> = 0xAA0000
-local alertBg <const> = 0xFF0000
+
 local maxHistoryEntries <const> = 5
-local historyX <const> = 160
+local historyX <const> = 172
 local historyY <const> = 33
-local historySpacing <const> = 8
+local historySpacing <const> = 10
+
+local panelX <const> = 160
+local panelY <const> = 16
+local panelWidth <const> = 72
+local panelHeight <const> = 24
+local panelTextX <const> = 172
+local panelLabelY <const> = 16
+local panelValueY <const> = 25
 
 local groundedFrames = 0
 local lastGroundedFrames = 0
 local wasGrounded = false
+local isGroundedNow = false
 local groundedHistory = {}
 
-local function getIsGround()
-	local v = emu.read(0x00B0, emu.memType.nesMemory, false)
-	return (v & 0x04) ~= 0
+local function getIsGrounded()
+	local value = emu.read(0x00B0, emu.memType.nesMemory, false)
+	return (value & 0x04) ~= 0
 end
 
 local function pushGroundedHistory(count)
@@ -27,26 +34,25 @@ local function pushGroundedHistory(count)
 	end
 end
 
-local function drawGroundedHistory()
-	for i = 1, #groundedHistory do
-		local count = groundedHistory[i]
-		local entryBg = black
-		local entryText = string.format("%d", count)
-
-		if count == 1 then
-			entryBg = green
-		end
-
-		if count >= 10 then
-			entryText = "X"
-		end
-
-		emu.drawString(historyX + (i - 1) * historySpacing, historyY, entryText, fg, entryBg)
+local function getHistoryText(count)
+	if count >= 10 then
+		return "X"
 	end
+
+	return string.format("%d", count)
 end
 
-local function drawState()
-	local isGrounded = getIsGround()
+local function getHistoryBackground(count)
+	if count == 1 then
+		return green
+	end
+
+	return black
+end
+
+local function updateGroundedState()
+	local isGrounded = getIsGrounded()
+	isGroundedNow = isGrounded
 
 	if isGrounded then
 		groundedFrames = groundedFrames + 1
@@ -54,18 +60,40 @@ local function drawState()
 	elseif wasGrounded and groundedFrames > 0 then
 		pushGroundedHistory(groundedFrames)
 		groundedFrames = 0
-	else
-		groundedFrames = 0
 	end
 
-	emu.drawRectangle(160, 16, 72, 24, black, true, 1, 0)
-	emu.drawString(172, 16, "GROUNDED", fg)
-	emu.drawString(172, 25, lastGroundedFrames, fg, black)
-	drawGroundedHistory()
+	if not isGrounded then
+		groundedFrames = 0
+	end
 
 	wasGrounded = isGrounded
 end
 
-emu.addEventCallback(drawState, emu.eventType.endFrame)
+local function drawGroundedPanel()
+	emu.drawRectangle(panelX, panelY, panelWidth, panelHeight, black, true, 1, 0)
+	if isGroundedNow then
+		emu.drawString(panelTextX, panelLabelY, "GROUNDED", fg)
+	end
+	emu.drawString(panelTextX, panelValueY, lastGroundedFrames, fg, black)
+end
+
+local function drawGroundedHistory()
+	for i = 1, #groundedHistory do
+		local count = groundedHistory[i]
+		local x = historyX + (i - 1) * historySpacing
+		local text = getHistoryText(count)
+		local background = getHistoryBackground(count)
+
+		emu.drawString(x, historyY, text, fg, background)
+	end
+end
+
+local function onEndFrame()
+	updateGroundedState()
+	drawGroundedPanel()
+	drawGroundedHistory()
+end
+
+emu.addEventCallback(onEndFrame, emu.eventType.endFrame)
 
 emu.displayMessage("Script", "Frame perfect jump trainer")
