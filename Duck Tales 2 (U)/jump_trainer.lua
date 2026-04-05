@@ -1,8 +1,9 @@
-﻿local fg <const> = 0xFFFFFF
+local fg <const> = 0xFFFFFF
 local black <const> = 0x000000
 local green <const> = 0x00AA00
 
 local maxHistoryEntries <const> = 5
+local historyLifetimeFrames <const> = 120
 local historyX <const> = 172
 local historyY <const> = 33
 local historySpacing <const> = 10
@@ -15,6 +16,7 @@ local panelTextX <const> = 172
 local panelLabelY <const> = 16
 local panelValueY <const> = 25
 
+local currentFrame = 0
 local groundedFrames = 0
 local lastGroundedFrames = 0
 local wasGrounded = false
@@ -26,8 +28,24 @@ local function getIsGrounded()
 	return (value & 0x04) ~= 0
 end
 
+local function pruneExpiredHistory()
+	local activeHistory = {}
+
+	for i = 1, #groundedHistory do
+		local entry = groundedHistory[i]
+		if currentFrame <= entry.expiresAt then
+			table.insert(activeHistory, entry)
+		end
+	end
+
+	groundedHistory = activeHistory
+end
+
 local function pushGroundedHistory(count)
-	table.insert(groundedHistory, 1, count)
+	table.insert(groundedHistory, 1, {
+		count = count,
+		expiresAt = currentFrame + historyLifetimeFrames,
+	})
 
 	if #groundedHistory > maxHistoryEntries then
 		table.remove(groundedHistory)
@@ -79,16 +97,18 @@ end
 
 local function drawGroundedHistory()
 	for i = 1, #groundedHistory do
-		local count = groundedHistory[i]
+		local entry = groundedHistory[i]
 		local x = historyX + (i - 1) * historySpacing
-		local text = getHistoryText(count)
-		local background = getHistoryBackground(count)
+		local text = getHistoryText(entry.count)
+		local background = getHistoryBackground(entry.count)
 
 		emu.drawString(x, historyY, text, fg, background)
 	end
 end
 
 local function onEndFrame()
+	currentFrame = currentFrame + 1
+	pruneExpiredHistory()
 	updateGroundedState()
 	drawGroundedPanel()
 	drawGroundedHistory()
