@@ -1,9 +1,10 @@
-local fg <const> = 0xFFFFFF
+﻿local fg <const> = 0xFFFFFF
 local black <const> = 0x000000
 local green <const> = 0x00AA00
 
+local playerYAddress <const> = 0x0099
+
 local maxHistoryEntries <const> = 5
-local historyLifetimeFrames <const> = 120
 local historyX <const> = 172
 local historyY <const> = 33
 local historySpacing <const> = 10
@@ -16,11 +17,13 @@ local panelTextX <const> = 172
 local panelLabelY <const> = 16
 local panelValueY <const> = 25
 
-local currentFrame = 0
 local groundedFrames = 0
 local lastGroundedFrames = 0
 local wasGrounded = false
 local isGroundedNow = false
+local wasGroundedAtFrameStart = false
+local previousY = nil
+local previousYDelta = 0
 local groundedHistory = {}
 
 local function getIsGrounded()
@@ -28,24 +31,12 @@ local function getIsGrounded()
 	return (value & 0x04) ~= 0
 end
 
-local function pruneExpiredHistory()
-	local activeHistory = {}
-
-	for i = 1, #groundedHistory do
-		local entry = groundedHistory[i]
-		if currentFrame <= entry.expiresAt then
-			table.insert(activeHistory, entry)
-		end
-	end
-
-	groundedHistory = activeHistory
+local function getPlayerY()
+	return emu.read(playerYAddress, emu.memType.nesMemory, false)
 end
 
 local function pushGroundedHistory(count)
-	table.insert(groundedHistory, 1, {
-		count = count,
-		expiresAt = currentFrame + historyLifetimeFrames,
-	})
+	table.insert(groundedHistory, 1, count)
 
 	if #groundedHistory > maxHistoryEntries then
 		table.remove(groundedHistory)
@@ -61,11 +52,27 @@ local function getHistoryText(count)
 end
 
 local function getHistoryBackground(count)
-	if count == 1 then
+	if count == 0 then
 		return green
 	end
 
 	return black
+end
+
+local function updateJumpHistory()
+	local currentY = getPlayerY()
+
+	if previousY ~= nil then
+		local currentYDelta = currentY - previousY
+
+		if previousYDelta > 0 and currentYDelta < 0 and not wasGroundedAtFrameStart and not isGroundedNow then
+			pushGroundedHistory(0)
+		end
+
+		previousYDelta = currentYDelta
+	end
+
+	previousY = currentY
 end
 
 local function updateGroundedState()
@@ -97,19 +104,19 @@ end
 
 local function drawGroundedHistory()
 	for i = 1, #groundedHistory do
-		local entry = groundedHistory[i]
+		local count = groundedHistory[i]
 		local x = historyX + (i - 1) * historySpacing
-		local text = getHistoryText(entry.count)
-		local background = getHistoryBackground(entry.count)
+		local text = getHistoryText(count)
+		local background = getHistoryBackground(count)
 
 		emu.drawString(x, historyY, text, fg, background)
 	end
 end
 
 local function onEndFrame()
-	currentFrame = currentFrame + 1
-	pruneExpiredHistory()
+	wasGroundedAtFrameStart = wasGrounded
 	updateGroundedState()
+	updateJumpHistory()
 	drawGroundedPanel()
 	drawGroundedHistory()
 end
