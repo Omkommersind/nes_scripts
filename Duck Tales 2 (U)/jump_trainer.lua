@@ -45,7 +45,7 @@ end
 
 local function getHistoryText(count)
 	if count >= 10 then
-		return "X"
+		return "9"
 	end
 
 	return string.format("%d", count)
@@ -82,12 +82,10 @@ local function updateGroundedState()
 	if isGrounded then
 		groundedFrames = groundedFrames + 1
 		lastGroundedFrames = groundedFrames
-	elseif wasGrounded and groundedFrames > 0 then
-		pushGroundedHistory(groundedFrames)
-		groundedFrames = 0
-	end
-
-	if not isGrounded then
+	else
+		if wasGrounded and groundedFrames > 0 then
+			pushGroundedHistory(groundedFrames)
+		end
 		groundedFrames = 0
 	end
 
